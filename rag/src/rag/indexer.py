@@ -1,10 +1,15 @@
 """Index PubMedQA documents into pgvector."""
 
+import logging
+import math
+
 import ollama
 from datasets import Dataset
 from sqlalchemy.orm import Session
 
 from rag.database.crud import insert_document
+
+logger = logging.getLogger(__name__)
 
 
 def _join_context(paragraphs: list[str]) -> str:
@@ -40,7 +45,22 @@ def _embed(text: str, model: str) -> list[float]:
     A list of floats representing the embedding vector.
     """
     response = ollama.embed(model=model, input=text)
+    # ollama.embed accepts a list of inputs for batch efficiency, but we pass a
+    # single string, so there is always exactly one embedding in the response.
     vector = response.embeddings[0]
+
+    # L2 norm measures the vector's magnitude. nomic-embed-text returns
+    # normalised vectors, so this should be very close to 1.0. A value
+    # far from 1.0 would indicate the model is not producing unit vectors,
+    # which matters because cosine similarity assumes unit normalisation.
+    norm = math.sqrt(sum(value * value for value in vector))
+    logger.debug(
+        "embedding produced: dimensions=%d, norm=%.6f, sample=%s",
+        len(vector),
+        norm,
+        [round(value, 4) for value in vector[:5]],
+    )
+
     return vector
 
 

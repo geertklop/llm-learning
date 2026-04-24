@@ -1,6 +1,7 @@
 """Command-line interface for the RAG pipeline."""
 
 import argparse
+import logging
 
 from datasets import load_dataset
 
@@ -14,13 +15,16 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="rag",
         description="Medical RAG pipeline using Ollama and pgvector.",
     )
-    parser.add_argument(
-        "--model",
-        help="Override the LLM model from settings (e.g. gemma3:4b).",
-    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("ingest", help="Initialise the database and index documents.")
+    ingest_parser = subparsers.add_parser(
+        "ingest", help="Initialise the database and index documents."
+    )
+    ingest_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable DEBUG logging (shows embedding dimensions, norm, sample values).",
+    )
 
     return parser
 
@@ -31,8 +35,10 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = Settings()
-    if args.model:
-        settings.llm_model = args.model
+    if args.debug:
+        logging.basicConfig(
+            level=logging.DEBUG, format="%(name)s %(levelname)s %(message)s"
+        )
 
     if args.command == "ingest":
         create_schema(settings)
