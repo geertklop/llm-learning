@@ -16,11 +16,12 @@ dev = [
 # mypy — static type checker
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 pretty = true
 
 [tool.uv.workspace]
 members = [
     "rag",
+    "agents",
 ]

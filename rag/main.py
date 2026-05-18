@@ -1,4 +1,8 @@
-def main():
+"""Entry point stub for the rag package."""
+
+
+def main() -> None:
+    """Run the rag CLI."""
     print("Hello from rag!")
 
 

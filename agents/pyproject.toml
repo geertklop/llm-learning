@@ -1,0 +1,22 @@
+[project]
+name = "agents"
+version = "0.1.0"
+description = "Single and multi-agent systems using LangGraph"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=0.3",
+    "langchain-ollama>=0.3",
+    "pydantic-settings>=2.7",
+]
+
+[project.scripts]
+agents = "agents.cli:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools.packages.find]
+where = [
+    "src",
+]
