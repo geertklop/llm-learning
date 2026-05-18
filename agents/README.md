@@ -71,16 +71,17 @@ START
 
 ## Learning Phases
 
-| Phase | Concept | New primitives |
-|---|---|---|
-| 1 | Single agent — ReAct loop | `StateGraph`, `MessagesState`, `ToolNode`, `tools_condition` |
-| 2 | Memory & persistence | `MemorySaver`, `thread_id`, short-term vs long-term memory |
-| 3 | Multi-agent | Supervisor pattern, `Command`, subgraphs, handoffs |
-| 4 | Agentic RAG | RAG as a tool, CRAG pattern, pgvector integration |
+| Phase | Concept | New primitives | Commit |
+|---|---|---|---|
+| 1 | Single agent — ReAct loop | `StateGraph`, `MessagesState`, `ToolNode`, `tools_condition` | `0501a54` |
+| 2 | Memory & persistence | `SqliteSaver`, `thread_id`, Textual TUI | — |
+| 3 | Multi-agent | Supervisor pattern, `Command`, subgraphs, handoffs | — |
+| 4 | Agentic RAG | RAG as a tool, CRAG pattern, pgvector integration | — |
 
 ## Running
 
 ```bash
 cp .env.example .env         # add your config
-uv run agents single-agent "I have a fever and take warfarin. Can I take aspirin?"
+uv run agents chat           # start interactive session
+uv run agents chat --debug   # with full LLM prompt logging
 ```
