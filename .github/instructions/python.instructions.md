@@ -97,6 +97,8 @@ Avoid nested functions when possible, as they are hard to test.
 
 Keep functions short and focused on a single task as much as possible.
 
+Always place public functions before private (underscore-prefixed) ones within a module.
+
 ## Code blocks
 
 Use `pass` only when a code block genuinely requires no operation (rare in practice).
