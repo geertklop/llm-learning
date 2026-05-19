@@ -2,6 +2,18 @@
 
 Single and multi-agent systems using LangGraph, applied to medical AI.
 
+## Running commands
+
+This package is a member of the `llm-learning` uv workspace. Commands can be run from the repo root or from this directory:
+
+```bash
+# From repo root
+uv run --package agents agents --help
+
+# From this directory
+uv run agents --help
+```
+
 ## What is an Agent?
 
 A regular LLM call is one-shot: question in, answer out. An **agent** runs a loop:
@@ -48,8 +60,6 @@ This is equivalent to sending a system message once at the start of a chat API c
 
 **Effect on tool use:** the system prompt `"Use your tools to look up symptoms"` causes the agent to call `describe_symptom` even when it could answer from training data. Tool docstrings and system prompt wording directly influence which tools the agent reaches for.
 
-
-
 ```
 START
   │
@@ -61,22 +71,22 @@ START
   └─ no tool call? ──► END
 ```
 
-| Component | Role |
-|---|---|
-| `llm` node | Calls the LLM with the current message history |
-| `tools` node | Executes the requested tool, appends result to messages |
-| `tools_condition` | Inspects last AI message — routes to `tools` or `END` |
-| `MessagesState` | State schema — a list of messages with an append reducer |
-| `MemorySaver` | (Phase 2) Checkpoints state per `thread_id` for persistence |
+| Component         | Role                                                        |
+| ----------------- | ----------------------------------------------------------- |
+| `llm` node        | Calls the LLM with the current message history              |
+| `tools` node      | Executes the requested tool, appends result to messages     |
+| `tools_condition` | Inspects last AI message — routes to `tools` or `END`       |
+| `MessagesState`   | State schema — a list of messages with an append reducer    |
+| `MemorySaver`     | (Phase 2) Checkpoints state per `thread_id` for persistence |
 
 ## Learning Phases
 
-| Phase | Concept | New primitives | Commit |
-|---|---|---|---|
-| 1 | Single agent — ReAct loop | `StateGraph`, `MessagesState`, `ToolNode`, `tools_condition` | `0501a54` |
-| 2 | Memory & persistence | `SqliteSaver`, `thread_id`, Textual TUI | — |
-| 3 | Multi-agent | Supervisor pattern, `Command`, subgraphs, handoffs | — |
-| 4 | Agentic RAG | RAG as a tool, CRAG pattern, pgvector integration | — |
+| Phase | Concept                   | New primitives                                               | Commit    |
+| ----- | ------------------------- | ------------------------------------------------------------ | --------- |
+| 1     | Single agent — ReAct loop | `StateGraph`, `MessagesState`, `ToolNode`, `tools_condition` | `0501a54` |
+| 2     | Memory & persistence      | `SqliteSaver`, `thread_id`, Textual TUI                      | —         |
+| 3     | Multi-agent               | Supervisor pattern, `Command`, subgraphs, handoffs           | —         |
+| 4     | Agentic RAG               | RAG as a tool, CRAG pattern, pgvector integration            | —         |
 
 ## Running
 

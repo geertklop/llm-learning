@@ -3,14 +3,14 @@ name = "rag"
 version = "0.1.0"
 description = "Medical RAG pipeline using Ollama and pgvector"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
-    "ollama>=0.4",
-    "psycopg[binary]>=3.2",
-    "sqlalchemy>=2.0",
-    "pgvector>=0.3",
-    "datasets>=3.5",
-    "pydantic-settings>=2.7",
+    "ollama>=0.6.1",
+    "psycopg[binary]>=3.3.3",
+    "sqlalchemy>=2.0.49",
+    "pgvector>=0.4.2",
+    "datasets>=4.8.4",
+    "pydantic-settings>=2.14.0",
 ]
 
 [project.scripts]
@@ -19,7 +19,8 @@ rag = "rag.cli:main"
 [tool.uv]
 package = true
 
-[tool.setuptools.packages.find]
-where = [
-    "src",
+[build-system]
+requires = [
+    "uv_build>=0.6.1,<0.7",
 ]
+build-backend = "uv_build"

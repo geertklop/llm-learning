@@ -12,6 +12,7 @@
         }
     ],
     "chat.tools.terminal.autoApprove": {
-        "uv": true
+        "uv": true,
+        "git commit": true
     }
 }

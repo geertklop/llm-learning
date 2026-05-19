@@ -49,6 +49,8 @@ question
 
 ## Setup
 
+> This package is a member of the `llm-learning` uv workspace. Steps 4 and 5 can also be run from the repo root as `uv run --package rag rag ingest` / `uv run --package rag rag query "..."`.
+
 ```bash
 # 1. Start the database
 docker compose up -d
