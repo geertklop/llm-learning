@@ -31,8 +31,7 @@ def describe_symptom(symptom: str) -> str:
     return descriptions.get(symptom.lower(), "Symptom not recognized.")
 
 
-@tool
-def check_drug_interactions(new_drug: str, existing_drugs: list[str]) -> str:
+def check_drug_interactions(new_drug: str, existing_drugs: list[str]) -> str | None:
     """Check for potential interactions between two drugs.
 
     This tool is used to ensure that any medications prescribed by the agent do not
@@ -60,4 +59,4 @@ def check_drug_interactions(new_drug: str, existing_drugs: list[str]) -> str:
         if key in interactions:
             return interactions[key]
 
-    return "No interactions found."
+    return None

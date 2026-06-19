@@ -1,20 +1,28 @@
 """Streaming multi-turn interactive chat runner for the medical agent."""
 
+import logging
+from uuid import uuid4
+
 from agents.config import Settings
 from agents.single_agent.graph import create_graph
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command
+
+logger = logging.getLogger(__name__)
 
 
 def run_chat() -> None:
-    """
-    Run an interactive multi-turn chat loop with the single agent.
+    """Run an interactive multi-turn chat loop with the medical agent.
 
     Maintains message history from the final graph state after each turn.
+    Each session gets a unique thread_id so the MemorySaver checkpointer
+    can persist state across interrupt/resume cycles.
     Type 'exit' or 'quit' to end the session.
     """
     settings = Settings()
     graph = create_graph(settings)
+    config = {"configurable": {"thread_id": str(uuid4())}}
     history: list[BaseMessage] = []
 
     print("Medical assistant ready. Type 'exit' to quit.\n")
@@ -25,54 +33,52 @@ def run_chat() -> None:
             break
 
         history.append(HumanMessage(content=question))
-        updated = _run_turn(graph, history)
+        updated = _run_turn(graph, history, config)
         if updated:
             history = updated
 
 
 def _run_turn(
-    graph: CompiledStateGraph, history: list[BaseMessage]
+    graph: CompiledStateGraph,
+    history: list[BaseMessage],
+    config: dict,
 ) -> list[BaseMessage] | None:
-    """Stream one conversation turn and return the updated message history.
+    """Run a single turn: invoke the graph, handle doctor_review interrupt.
 
-    stream_mode=["values", "messages"] yields two event types:
-      ("messages", (chunk, metadata)) — token-by-token LLM output
-      ("values", state)               — full state snapshot after each node
-    We use "messages" for live printing and "values" to update history.
-    The system prompt is prepended inside create_llm_node and never stored
-    in state, so history slicing remains clean.
+    Parameters
+    ----------
+    graph
+        The compiled state graph.
+    history
+        The accumulated message history from the conversation so far.
+    config
+        LangGraph run config, must include ``thread_id`` for checkpointing.
     """
-    final_state = None
-    in_ai_response = False
+    stream = graph.stream_events(
+        {
+            "messages": history,
+            "symptoms": None,
+            "medications": None,
+            "urgency": None,
+            "findings": None,
+            "draft_response": None,
+        },
+        config,
+        version="v3",
+    )
+    _ = stream.output  # drives graph to completion or pause at interrupt
 
-    for event in graph.stream(
-        {"messages": history}, stream_mode=["values", "messages"]
-    ):
-        mode, data = event
+    if stream.interrupts:
+        draft = stream.interrupts[0].value
+        print(f"\n[doctor review]\n{draft}\n")
+        edit = input("Press Enter to approve, or type an edited response: ").strip()
+        approved = edit if edit else draft
 
-        if mode == "messages":
-            chunk, metadata = data
-            node = metadata.get("langgraph_node", "")
+        resumed = graph.stream_events(Command(resume=approved), config, version="v3")
+        output = resumed.output
+    else:
+        output = stream.output
 
-            if node == "tools" and chunk.content:
-                # Tool results arrive complete, not streamed.
-                print(f"\ntool: {chunk.content}\n")
-                in_ai_response = False
-
-            elif node == "llm" and chunk.content:
-                # Stream LLM text token by token.
-                # Chunks without content are tool-call JSON — skip them.
-                if not in_ai_response:
-                    print("ai: ", end="", flush=True)
-                    in_ai_response = True
-                print(chunk.content, end="", flush=True)
-
-        elif mode == "values":
-            final_state = data
-
-    if in_ai_response:
-        print("\n")
-
-    if final_state:
-        return final_state["messages"]
+    if isinstance(output, dict) and "messages" in output:
+        return output["messages"]
     return None
