@@ -1,0 +1,19 @@
+{
+    "folders": [
+        {
+            "path": "../rag"
+        },
+        {
+            "path": "../agents"
+        }
+        {
+            "path": "../"
+        }
+    ],
+    "settings": {
+        "chat.tools.terminal.autoApprove": {
+            "uv": true,
+            "git commit": true
+        }
+    }
+}

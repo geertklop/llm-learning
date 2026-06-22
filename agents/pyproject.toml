@@ -8,6 +8,10 @@ dependencies = [
     "langgraph>=1.2.0",
     "langchain-ollama>=1.1.0",
     "pydantic-settings>=2.14.0",
+    "pgvector>=0.4.2",
+    "sqlalchemy>=2.0.51",
+    "psycopg[binary]>=3.3.4",
+    "ollama>=0.6.2",
 ]
 
 [project.scripts]

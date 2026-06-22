@@ -62,6 +62,7 @@ def _run_turn(
             "urgency": None,
             "findings": None,
             "draft_response": None,
+            "retrieved_guidelines": None,
         },
         config,
         version="v3",

@@ -64,7 +64,7 @@ def create_graph(settings: Settings) -> CompiledStateGraph:
 
     graph = StateGraph(state_schema=MedicalState)
     graph.add_node(NodeNames.CLASSIFY, create_classify_node(llm))
-    graph.add_node(NodeNames.TRIAGE, create_triage_node(llm))
+    graph.add_node(NodeNames.TRIAGE, create_triage_node(llm, settings))
     graph.add_node(NodeNames.INTERACTIONS, create_medication_interactions_node(llm))
     graph.add_node(NodeNames.RESPOND, create_respond_node(llm))
     graph.add_node(NodeNames.ESCALATE, escalate)

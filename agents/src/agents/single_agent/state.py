@@ -26,12 +26,15 @@ class MedicalState(TypedDict):
         The AI-generated draft response produced by the respond node. Preserved
         after doctor review for audit; the doctor-approved text is appended to
         ``messages`` instead.
+    retrieved_guidelines
+        Medical context passages retrieved from pgvector by the triage node,
+        used to ground the urgency assessment in evidence-based guidelines.
     """
 
     messages: list[BaseMessage]
     symptoms: list[str] | None
     medications: list[str] | None
     urgency: URGENCY_OPTIONS | None
-
     findings: list[str] | None
     draft_response: str | None
+    retrieved_guidelines: list[str] | None

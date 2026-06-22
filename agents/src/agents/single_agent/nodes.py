@@ -15,6 +15,8 @@ from langgraph.types import Command, interrupt
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from .tools import check_drug_interactions
+from ..retriever import retrieve_guidelines
+from ..config import Settings
 
 from .state import MedicalState, URGENCY_OPTIONS
 from .schemas import MessageClassification, TriageOutput
@@ -73,18 +75,28 @@ def create_classify_node(llm: ChatOllama) -> Callable[..., Command]:
     return classify
 
 
-def create_triage_node(llm: ChatOllama) -> Callable[..., Command]:
+def create_triage_node(llm: ChatOllama, settings: Settings) -> Callable[..., Command]:
     """Create the triage node function."""
     triagist = llm.with_structured_output(TriageOutput)
 
     def triage(state: MedicalState) -> Command:
         """LLM node that evaluates the urgency of the user's symptoms.
 
-        Expects symptoms to be present in the state. Uses structured output parsing
-        to classify the urgency level as "red", "orange", "yellow", or "green".
+        Retrieves relevant medical guidelines from pgvector before calling the LLM,
+        grounding the urgency assessment in evidence-based context. Uses structured
+        output parsing to classify urgency as "red", "orange", "yellow", or "green".
         Routes to different nodes based on the urgency and presence of medications.
         """
-        symptoms_formatted = "\n- ".join(state["symptoms"])
+        symptoms = state["symptoms"] or []
+        guidelines = retrieve_guidelines(symptoms, settings)
+
+        symptoms_formatted = "\n- ".join(symptoms)
+        guidelines_section = (
+            "\n\nRelevant medical guidelines:\n"
+            + "\n---\n".join(guidelines)
+            if guidelines
+            else ""
+        )
 
         triage_prompt = HumanMessage(
             content=(
@@ -92,6 +104,7 @@ def create_triage_node(llm: ChatOllama) -> Callable[..., Command]:
                 "classify the urgency level as 'red' (emergency), 'orange' (urgent, advise same-day care), "
                 "'yellow' (non-urgent, book appointment), or 'green' (routine, no action needed)."
                 f"\n- {symptoms_formatted}"
+                f"{guidelines_section}"
             )
         )
 
@@ -104,7 +117,10 @@ def create_triage_node(llm: ChatOllama) -> Callable[..., Command]:
         else:
             goto = NodeNames.RESPOND
 
-        return Command(update={"urgency": result.urgency}, goto=goto)
+        return Command(
+            update={"urgency": result.urgency, "retrieved_guidelines": guidelines},
+            goto=goto,
+        )
 
     return triage
 

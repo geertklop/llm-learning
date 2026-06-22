@@ -19,9 +19,3 @@ dev = [
 python_version = "3.14"
 strict = true
 pretty = true
-
-[tool.uv.workspace]
-members = [
-    "rag",
-    "agents",
-]

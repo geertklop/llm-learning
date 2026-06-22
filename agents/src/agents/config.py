@@ -19,9 +19,28 @@ class Settings(BaseSettings):
     ollama_model
         Ollama model used for the agent LLM. Must support tool calling
         (e.g. llama3.1:8b, llama3.2:3b, qwen2.5:7b).
+    ollama_embed_model
+        Ollama model used for producing embeddings. Must match the model used
+        during RAG ingestion (e.g. nomic-embed-text).
+    postgres_host
+        Hostname of the PostgreSQL server.
+    postgres_port
+        Port the PostgreSQL server listens on.
+    postgres_user
+        PostgreSQL user to authenticate as.
+    postgres_password
+        Password for the PostgreSQL user.
+    postgres_db
+        PostgreSQL database name.
     """
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:3b"
+    ollama_embed_model: str = "nomic-embed-text"
+    postgres_host: str = "localhost"
+    postgres_port: int = 5432
+    postgres_user: str = "llm"
+    postgres_password: str = "llm"
+    postgres_db: str = "llm"

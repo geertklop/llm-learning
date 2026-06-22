@@ -1,6 +1,7 @@
 """Command-line interface for the agents project."""
 
 import argparse
+import logging
 
 from langchain_core.globals import set_debug
 
@@ -22,7 +23,7 @@ def _build_parser() -> argparse.ArgumentParser:
     chat_parser.add_argument(
         "--debug",
         action="store_true",
-        help="Print the full prompt and tool schemas sent to the LLM.",
+        help="Enable debug logging and print the full LangChain prompt/tool schemas.",
     )
 
     return parser
@@ -36,6 +37,7 @@ def main() -> None:
     if args.command == "chat":
         if args.debug:
             set_debug(True)
+            logging.basicConfig(level=logging.DEBUG)
         run_chat()
 
 
