@@ -6,6 +6,29 @@ from langchain_core.messages import BaseMessage
 URGENCY_OPTIONS = Literal["red", "orange", "yellow", "green"]
 
 
+class GuidelineResult(TypedDict):
+    """
+    A single retrieved guideline chunk stored in the graph state.
+
+    Attributes
+    ----------
+    url
+        Canonical Thuisarts URL with urgency fragment (e.g. #spoed-bel-direct).
+    title
+        Article title (e.g. "Ik heb buikpijn").
+    urgency_hint
+        Urgency level implied by the sub-section: "red", "orange", "yellow",
+        or None if unrecognised.
+    context
+        Text of the urgency sub-section used as LLM context.
+    """
+
+    url: str
+    title: str
+    urgency_hint: str | None
+    context: str
+
+
 class MedicalState(TypedDict):
     """State to be used accross the medical answering and triaging process
 
@@ -27,8 +50,9 @@ class MedicalState(TypedDict):
         after doctor review for audit; the doctor-approved text is appended to
         ``messages`` instead.
     retrieved_guidelines
-        Medical context passages retrieved from pgvector by the triage node,
-        used to ground the urgency assessment in evidence-based guidelines.
+        Medical guideline chunks retrieved from pgvector by the triage node,
+        used to ground the urgency assessment. Each entry includes the source
+        URL, title, urgency hint, and context text.
     """
 
     messages: list[BaseMessage]
@@ -37,4 +61,4 @@ class MedicalState(TypedDict):
     urgency: URGENCY_OPTIONS | None
     findings: list[str] | None
     draft_response: str | None
-    retrieved_guidelines: list[str] | None
+    retrieved_guidelines: list[GuidelineResult] | None

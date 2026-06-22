@@ -10,6 +10,7 @@ from rag.database import create_schema, get_session
 from rag.generator import generate
 from rag.indexer import ingest
 from rag.retriever import retrieve
+from rag.thuisarts_indexer import ingest_guidelines
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -27,6 +28,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--debug",
         action="store_true",
         help="Enable DEBUG logging (shows embedding dimensions, norm, sample values).",
+    )
+
+    guidelines_parser = subparsers.add_parser(
+        "ingest-guidelines",
+        help="Scrape Thuisarts.nl triage articles and index them into the guidelines table.",
+    )
+    guidelines_parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable DEBUG logging (shows skipped pages and embedding details).",
     )
 
     query_parser = subparsers.add_parser(
@@ -58,6 +69,20 @@ def main() -> None:
         dataset = load_dataset("qiaojin/PubMedQA", "pqa_labeled", split="train")
         session = get_session(settings)
         ingest(dataset, session, settings.embed_model)
+        session.close()
+
+    if args.command == "ingest-guidelines":
+        if args.debug:
+            logging.basicConfig(
+                level=logging.DEBUG, format="%(name)s %(levelname)s %(message)s"
+            )
+        else:
+            logging.basicConfig(
+                level=logging.INFO, format="%(name)s %(levelname)s %(message)s"
+            )
+        create_schema(settings)
+        session = get_session(settings)
+        ingest_guidelines(session, settings.guidelines_embed_model)
         session.close()
 
     if args.command == "query":

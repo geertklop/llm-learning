@@ -26,8 +26,12 @@ class Settings(BaseSettings):
     ollama_host
         Base URL of the Ollama HTTP API.
     embed_model
-        Ollama model used to produce embeddings. Must produce 768-dimensional
-        vectors to match the vector(768) column in the database schema.
+        Ollama model used to produce embeddings for PubMed documents. Must
+        produce 768-dimensional vectors (e.g. nomic-embed-text).
+    guidelines_embed_model
+        Ollama model used to embed Thuisarts guideline chunks. bge-m3 is
+        multilingual, produces 1024-dimensional vectors, and has an 8192
+        token context window — no truncation needed for triage sections.
     llm_model
         Ollama model used to generate answers from retrieved context.
         Overridable at runtime via --model or the LLM_MODEL env var.
@@ -54,5 +58,6 @@ class Settings(BaseSettings):
 
     ollama_host: str = "http://localhost:11434"
     embed_model: str = "nomic-embed-text"
+    guidelines_embed_model: str = "bge-m3"
     llm_model: str = "llama3.2:3b"
     top_k: int = 5

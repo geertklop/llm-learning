@@ -93,7 +93,7 @@ def create_triage_node(llm: ChatOllama, settings: Settings) -> Callable[..., Com
         symptoms_formatted = "\n- ".join(symptoms)
         guidelines_section = (
             "\n\nRelevant medical guidelines:\n"
-            + "\n---\n".join(guidelines)
+            + "\n---\n".join(g["context"] for g in guidelines)
             if guidelines
             else ""
         )
@@ -202,6 +202,14 @@ def create_respond_node(llm: ChatOllama) -> Callable[..., Command]:
             )
         else:
             draft = str(content)
+
+        guidelines = state["retrieved_guidelines"] or []
+        if guidelines:
+            sources = "\n".join(
+                f"- {g['title']}: {g['url']}" for g in guidelines
+            )
+            draft = f"{draft}\n\nBronnen:\n{sources}"
+
         return Command(update={"draft_response": draft}, goto=NodeNames.DOCTOR_REVIEW)
 
     return respond

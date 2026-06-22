@@ -8,11 +8,13 @@ from sqlalchemy import Index, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from agents.config import Settings
+from agents.single_agent.state import GuidelineResult
 
 logger = logging.getLogger(__name__)
 
 # Must match the embedding model dimensionality used during RAG ingestion.
-_EMBEDDING_DIMENSIONS = 768
+# bge-m3 produces 1024-dimensional vectors.
+_EMBEDDING_DIMENSIONS = 1024
 
 # Cosine distance ranges from 0 (identical) to 2 (opposite directions).
 # Documents with a distance above this threshold are considered irrelevant.
@@ -23,38 +25,45 @@ class _Base(DeclarativeBase):
     """SQLAlchemy declarative base for read-only ORM access."""
 
 
-class _Document(_Base):
+class _Guideline(_Base):
     """
-    Read-only ORM view of the documents table populated by the RAG project.
+    Read-only ORM view of the guidelines table populated by the RAG project.
+
+    Each row represents the "Wanneer bel je de huisarts" section from one
+    Thuisarts.nl patient-situation page, indexed with NHG-based triage criteria.
 
     Attributes
     ----------
     id
         Auto-incrementing primary key.
-    pubid
-        Unique PubMedQA identifier.
-    question
-        The research question from PubMedQA.
+    url
+        Canonical Thuisarts URL.
+    title
+        Article title (e.g. "Ik heb buikpijn").
+    slug
+        First URL path segment identifying the condition (e.g. "buikpijn").
     context
-        Concatenated abstract paragraphs used as retrieved context.
+        Full text of the triage section, including urgency sub-headings.
     embedding
         768-dimensional vector produced by the embedding model.
     """
 
-    __tablename__ = "documents"
+    __tablename__ = "guidelines"
     __table_args__ = (
         Index(
-            "documents_embedding_idx",
+            "guidelines_embedding_idx",
             "embedding",
             postgresql_using="ivfflat",
-            postgresql_with={"lists": 100},
+            postgresql_with={"lists": 30},
             postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    pubid: Mapped[str] = mapped_column(String, unique=True)
-    question: Mapped[str] = mapped_column(Text)
+    url: Mapped[str] = mapped_column(String, unique=True)
+    title: Mapped[str] = mapped_column(Text)
+    slug: Mapped[str] = mapped_column(String)
+    urgency_hint: Mapped[str | None] = mapped_column(String, nullable=True)
     context: Mapped[str] = mapped_column(Text)
     embedding: Mapped[Vector] = mapped_column(Vector(_EMBEDDING_DIMENSIONS))
 
@@ -64,13 +73,13 @@ def retrieve_guidelines(
     settings: Settings,
     top_k: int = 5,
     threshold: float = _DEFAULT_THRESHOLD,
-) -> list[str]:
+) -> list[GuidelineResult]:
     """
     Retrieve the most relevant medical context passages for the given symptoms.
 
     Each symptom is embedded and queried independently (multi-query retrieval).
-    Results are merged, deduplicated by document ID, and filtered by a cosine
-    distance threshold before returning the top-K most relevant passages.
+    Results are merged, deduplicated by URL, and filtered by a cosine distance
+    threshold before returning the top-K most relevant passages.
 
     Parameters
     ----------
@@ -87,7 +96,7 @@ def retrieve_guidelines(
 
     Returns
     -------
-    List of context strings ordered by relevance (closest first). May be
+    List of GuidelineResult ordered by relevance (closest first). May be
     shorter than ``top_k`` if fewer documents pass the relevance threshold.
     """
     if not symptoms:
@@ -99,31 +108,40 @@ def retrieve_guidelines(
     )
     engine = create_engine(dsn)
 
-    # best_by_pubid maps pubid -> (document, best_distance) across all symptom queries.
-    best_by_pubid: dict[str, tuple[_Document, float]] = {}
+    # best_by_url maps url -> (guideline, best_distance) across all symptom queries.
+    best_by_pubid: dict[str, tuple[_Guideline, float]] = {}
 
     with Session(engine) as session:
         for symptom in symptoms:
             query_vector = _embed(symptom, settings.ollama_embed_model)
             candidates = _query_by_vector(session, query_vector, threshold, top_k)
             for document, distance in candidates:
-                existing = best_by_pubid.get(document.pubid)
+                existing = best_by_pubid.get(document.url)
                 if existing is None or distance < existing[1]:
-                    best_by_pubid[document.pubid] = (document, distance)
+                    best_by_pubid[document.url] = (document, distance)
 
     ranked = sorted(best_by_pubid.values(), key=lambda pair: pair[1])[:top_k]
 
     for rank, (document, distance) in enumerate(ranked, start=1):
         logger.debug(
-            "[%d/%d] pubid=%s distance=%.4f question=%s",
+            "[%d/%d] url=%s distance=%.4f urgency=%s title=%s",
             rank,
             len(ranked),
-            document.pubid,
+            document.url,
             distance,
-            document.question,
+            document.urgency_hint,
+            document.title,
         )
 
-    return [document.context for document, _ in ranked]
+    return [
+        GuidelineResult(
+            url=document.url,
+            title=document.title,
+            urgency_hint=document.urgency_hint,
+            context=document.context,
+        )
+        for document, _ in ranked
+    ]
 
 
 def _query_by_vector(
@@ -131,7 +149,7 @@ def _query_by_vector(
     query_vector: list[float],
     threshold: float,
     top_k: int,
-) -> list[tuple[_Document, float]]:
+) -> list[tuple[_Guideline, float]]:
     """
     Query the documents table for the nearest neighbours of a single vector.
 
@@ -150,9 +168,9 @@ def _query_by_vector(
     -------
     List of (document, cosine_distance) pairs ordered by distance ascending.
     """
-    distance_expr = _Document.embedding.cosine_distance(query_vector).label("distance")
+    distance_expr = _Guideline.embedding.cosine_distance(query_vector).label("distance")
     statement = (
-        select(_Document, distance_expr)
+        select(_Guideline, distance_expr)
         .where(distance_expr <= threshold)
         .order_by(distance_expr)
         .limit(top_k)

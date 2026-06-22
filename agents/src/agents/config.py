@@ -21,7 +21,7 @@ class Settings(BaseSettings):
         (e.g. llama3.1:8b, llama3.2:3b, qwen2.5:7b).
     ollama_embed_model
         Ollama model used for producing embeddings. Must match the model used
-        during RAG ingestion (e.g. nomic-embed-text).
+        during RAG ingestion (e.g. bge-m3 for guidelines).
     postgres_host
         Hostname of the PostgreSQL server.
     postgres_port
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:3b"
-    ollama_embed_model: str = "nomic-embed-text"
+    ollama_embed_model: str = "bge-m3"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_user: str = "llm"
