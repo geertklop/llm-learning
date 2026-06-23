@@ -1,6 +1,50 @@
 """Medical tools for the single agent."""
 
+import httpx
+from bs4 import BeautifulSoup
 from langchain_core.tools import tool
+
+_THUISARTS_BASE = "https://www.thuisarts.nl/"
+_MAX_ARTICLE_CHARS = 6000
+
+
+@tool
+def lookup_thuisarts_article(url: str) -> str:
+    """Fetch the full text of a Thuisarts.nl patient information article.
+
+    Use this before writing a recommendation to get the complete, up-to-date
+    guideline text. Only call with URLs that were provided in the context.
+
+    Parameters
+    ----------
+    url
+        Full Thuisarts.nl article URL, e.g.
+        ``https://www.thuisarts.nl/pijn-op-borst/ik-heb-pijn-op-borst-wat-kan-zijn``
+    """
+    if not url.startswith(_THUISARTS_BASE):
+        return "Error: only thuisarts.nl URLs are supported."
+
+    try:
+        response = httpx.get(
+            url,
+            headers={"User-Agent": "llm-learning/1.0"},
+            follow_redirects=True,
+            timeout=10,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        return f"Error fetching article: {exc}"
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    article = soup.find("article") or soup.find("main")
+    if not article:
+        return "Article content not found."
+
+    for tag in article.find_all(["script", "style", "nav", "footer", "aside"]):
+        tag.decompose()
+
+    text = article.get_text(separator="\n", strip=True)
+    return text[:_MAX_ARTICLE_CHARS]
 
 
 @tool

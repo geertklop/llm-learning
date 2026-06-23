@@ -54,8 +54,7 @@ def _run_turn(
     config
         LangGraph run config, must include ``thread_id`` for checkpointing.
     """
-    stream = graph.stream_events(
-        {
+    stream_input: dict | Command = {
             "messages": history,
             "symptoms": None,
             "medications": None,
@@ -63,22 +62,30 @@ def _run_turn(
             "findings": None,
             "draft_response": None,
             "retrieved_guidelines": None,
-        },
-        config,
-        version="v3",
-    )
-    _ = stream.output  # drives graph to completion or pause at interrupt
+            "clarification_round": None,
+            "clarification_question": None,
+        }
 
-    if stream.interrupts:
-        draft = stream.interrupts[0].value
-        print(f"\n[doctor review]\n{draft}\n")
-        edit = input("Press Enter to approve, or type an edited response: ").strip()
-        approved = edit if edit else draft
-
-        resumed = graph.stream_events(Command(resume=approved), config, version="v3")
-        output = resumed.output
-    else:
+    output = None
+    while True:
+        stream = graph.stream_events(stream_input, config, version="v3")
         output = stream.output
+
+        if not stream.interrupts:
+            break
+
+        interrupt_value = stream.interrupts[0].value
+
+        if isinstance(interrupt_value, dict) and interrupt_value.get("type") == "clarification":
+            question = interrupt_value["question"]
+            print(f"\n{question}\n")
+            answer = input("U: ").strip()
+            stream_input = Command(resume=answer)
+        else:
+            # Doctor review
+            print(f"\n[doctor review]\n{interrupt_value}\n")
+            edit = input("Press Enter to approve, or type an edited response: ").strip()
+            stream_input = Command(resume=edit if edit else interrupt_value)
 
     if isinstance(output, dict) and "messages" in output:
         return output["messages"]

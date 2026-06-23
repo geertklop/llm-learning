@@ -18,7 +18,10 @@ _EMBEDDING_DIMENSIONS = 1024
 
 # Cosine distance ranges from 0 (identical) to 2 (opposite directions).
 # Documents with a distance above this threshold are considered irrelevant.
-_DEFAULT_THRESHOLD = 0.4
+# bge-m3 on Dutch medical text: cardiac articles appear at ~0.36-0.40,
+# common symptom articles (koorts, etc.) appear at ~0.40-0.45.
+# 0.5 is a practical upper bound that captures both without excessive noise.
+_DEFAULT_THRESHOLD = 0.5
 
 
 class _Base(DeclarativeBase):
@@ -108,19 +111,21 @@ def retrieve_guidelines(
     )
     engine = create_engine(dsn)
 
-    # best_by_url maps url -> (guideline, best_distance) across all symptom queries.
-    best_by_pubid: dict[str, tuple[_Guideline, float]] = {}
+    # Deduplicate by slug so all three urgency chunks of the same article
+    # (spoed / vandaag / geen-spoed) don't consume multiple top-k slots.
+    # We keep the chunk with the lowest (best) distance per condition.
+    best_by_slug: dict[str, tuple[_Guideline, float]] = {}
 
     with Session(engine) as session:
         for symptom in symptoms:
             query_vector = _embed(symptom, settings.ollama_embed_model)
             candidates = _query_by_vector(session, query_vector, threshold, top_k)
             for document, distance in candidates:
-                existing = best_by_pubid.get(document.url)
+                existing = best_by_slug.get(document.slug)
                 if existing is None or distance < existing[1]:
-                    best_by_pubid[document.url] = (document, distance)
+                    best_by_slug[document.slug] = (document, distance)
 
-    ranked = sorted(best_by_pubid.values(), key=lambda pair: pair[1])[:top_k]
+    ranked = sorted(best_by_slug.values(), key=lambda pair: pair[1])[:top_k]
 
     for rank, (document, distance) in enumerate(ranked, start=1):
         logger.debug(
@@ -175,7 +180,9 @@ def _query_by_vector(
         .order_by(distance_expr)
         .limit(top_k)
     )
-    return [(document, float(distance)) for document, distance in session.execute(statement)]
+    return [
+        (document, float(distance)) for document, distance in session.execute(statement)
+    ]
 
 
 def _embed(text: str, model: str) -> list[float]:

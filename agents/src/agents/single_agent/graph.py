@@ -3,17 +3,17 @@
 from agents.config import Settings
 from langchain_ollama import ChatOllama
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from .nodes import (
     NodeNames,
+    clarify,
     create_classify_node,
     create_medication_interactions_node,
     create_respond_node,
     create_triage_node,
     doctor_review,
-    escalate,
 )
 from .state import MedicalState
 
@@ -29,9 +29,10 @@ def create_graph(settings: Settings) -> CompiledStateGraph:
         classify → triage           (symptoms present)
         classify → interactions     (medications only, no symptoms)
         classify → respond          (general query)
-        triage → escalate           (urgency == "red") → doctor_review → END
-        triage → interactions       (urgency != "red" and medications present)
-        triage → respond            (urgency != "red", no medications)
+        triage → clarify            (needs_clarification and rounds < 2)
+        clarify → classify          (patient answers; re-extract symptoms)
+        triage → respond            (all urgency levels once confident)
+        triage → interactions       (medications present, urgency != red)
         interactions → respond
         respond → doctor_review
         doctor_review → END
@@ -45,9 +46,6 @@ def create_graph(settings: Settings) -> CompiledStateGraph:
         Command(goto=...).
     interactions : Checks extracted medications for known interactions.
         Always routes to ``respond``.
-    escalate : Builds an emergency warning from symptoms, stores it in
-        ``draft_response``, and routes to ``doctor_review``. No interrupt here —
-        the doctor reviews via ``doctor_review``.
     respond : Final LLM call. Reads the full MedicalState (symptoms,
         medications, urgency) to produce a calibrated draft response stored
         in ``draft_response``. Does not append to ``messages``.
@@ -67,7 +65,7 @@ def create_graph(settings: Settings) -> CompiledStateGraph:
     graph.add_node(NodeNames.TRIAGE, create_triage_node(llm, settings))
     graph.add_node(NodeNames.INTERACTIONS, create_medication_interactions_node(llm))
     graph.add_node(NodeNames.RESPOND, create_respond_node(llm))
-    graph.add_node(NodeNames.ESCALATE, escalate)
+    graph.add_node(NodeNames.CLARIFY, clarify)
     graph.add_node(NodeNames.DOCTOR_REVIEW, doctor_review)
 
     graph.add_edge(START, NodeNames.CLASSIFY)

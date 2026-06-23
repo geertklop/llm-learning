@@ -74,7 +74,9 @@ def ingest_guidelines(session: Session, embed_model: str) -> None:
                 html = _fetch_page(client, url)
                 chunks = _parse_article_chunks(html, url)
             except httpx.HTTPStatusError as exc:
-                logger.warning("HTTP %s for %s — skipping", exc.response.status_code, url)
+                logger.warning(
+                    "HTTP %s for %s — skipping", exc.response.status_code, url
+                )
                 time.sleep(_REQUEST_DELAY)
                 continue
             except Exception as exc:
@@ -98,7 +100,13 @@ def ingest_guidelines(session: Session, embed_model: str) -> None:
             if indexed % 20 == 0:
                 session.commit()
 
-            logger.info("[%d/%d] indexed %d chunks from %s", index + 1, len(urls), len(chunks), url)
+            logger.info(
+                "[%d/%d] indexed %d chunks from %s",
+                index + 1,
+                len(urls),
+                len(chunks),
+                url,
+            )
             time.sleep(_REQUEST_DELAY)
 
     session.commit()
@@ -205,7 +213,8 @@ def _parse_article_chunks(html: str, url: str) -> list[dict]:
 
     triage_heading = None
     for heading in soup.find_all("h2"):
-        if "wanneer bel" in heading.get_text().lower():
+        text_lower = heading.get_text().lower()
+        if "wanneer" in text_lower and "bel" in text_lower:
             triage_heading = heading
             break
 

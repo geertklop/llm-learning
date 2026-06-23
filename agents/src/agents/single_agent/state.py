@@ -1,5 +1,4 @@
-from typing import TypedDict, Literal
-
+from typing import Literal, TypedDict
 
 from langchain_core.messages import BaseMessage
 
@@ -62,3 +61,5 @@ class MedicalState(TypedDict):
     findings: list[str] | None
     draft_response: str | None
     retrieved_guidelines: list[GuidelineResult] | None
+    clarification_round: int | None
+    clarification_question: str | None
