@@ -145,8 +145,13 @@ def create_triage_node(llm: ChatOllama, settings: Settings) -> Callable[..., Com
         clarification_round = state.get("clarification_round") or 0
         may_ask = clarification_round < MAX_CLARIFICATION_ROUNDS
         clarification_instruction = (
-            " If the symptoms are too vague to determine urgency confidently, "
-            "set needs_clarification=True and provide one focused question."
+            " If the symptoms are ambiguous or too vague to determine urgency "
+            "confidently, set needs_clarification=True and ask one focused question. "
+            "This is especially important when you suspect RED (emergency) urgency: "
+            "confirm the suspicion with a single targeted question before concluding "
+            "it is an emergency — for example asking about pain character, radiation, "
+            "or duration. Do not ask for clarification if the symptoms are already "
+            "clearly severe."
             if may_ask
             else " Do not ask for clarification — assess based on available information."
         )
@@ -164,7 +169,7 @@ def create_triage_node(llm: ChatOllama, settings: Settings) -> Callable[..., Com
         result = triagist.invoke([*state["messages"], triage_prompt])
         if result.needs_clarification and clarification_round < MAX_CLARIFICATION_ROUNDS:
             goto = NodeNames.CLARIFY
-        elif result.urgency == "red" or not state["medications"]:
+        elif not state["medications"] or result.urgency == "red":
             goto = NodeNames.RESPOND
         else:
             goto = NodeNames.INTERACTIONS
@@ -261,6 +266,9 @@ def create_respond_node(llm: ChatOllama) -> Callable[..., Command]:
         system_prompt = SystemMessage(content="\n".join(context_lines))
         messages: list = [system_prompt, *state["messages"]]
 
+        # Track which articles were actually fetched so only those appear as sources.
+        fetched: dict[str, str] = {}  # url → title
+
         while True:
             result = llm_with_tools.invoke(messages)
             messages.append(result)
@@ -273,6 +281,12 @@ def create_respond_node(llm: ChatOllama) -> Callable[..., Command]:
                 print(f"\n[Tool] lookup_thuisarts_article → {display}")
                 tool_output = lookup_thuisarts_article.invoke(tc)
                 messages.append(ToolMessage(content=str(tool_output), tool_call_id=tc["id"]))
+                # Match fetched URL back to a title from the retrieved guidelines.
+                title = next(
+                    (g["title"] for g in guidelines if g["url"] == url),
+                    display,
+                )
+                fetched[url] = title
 
         content = result.content
         if isinstance(content, str):
@@ -284,8 +298,8 @@ def create_respond_node(llm: ChatOllama) -> Callable[..., Command]:
         else:
             draft = str(content)
 
-        if guidelines:
-            sources = "\n".join(f"- {g['title']}: {g['url']}" for g in guidelines)
+        if fetched:
+            sources = "\n".join(f"- {title}: {url}" for url, title in fetched.items())
             draft = f"{draft}\n\nBronnen:\n{sources}"
 
         return Command(update={"draft_response": draft}, goto=NodeNames.DOCTOR_REVIEW)
